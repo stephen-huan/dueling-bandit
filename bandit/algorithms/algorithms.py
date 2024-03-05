@@ -33,8 +33,8 @@ from typing import Callable
 import numpy as np
 from scipy.stats import beta
 
-from . import utils
-from .utils import Arm, Duel
+from .. import utils
+from ..utils import Arm, Duel
 
 
 def naive(K: int, duel: Duel, T: int) -> Arm:
