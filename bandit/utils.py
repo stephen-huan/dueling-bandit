@@ -1,41 +1,74 @@
 """
 Helper library for shared types and utilites.
 """
-from typing import Callable
+from bisect import bisect_left
+from functools import wraps
+from typing import TYPE_CHECKING, Callable
 
+import jax
+import jax.numpy as jnp
 import numpy as np
-from numpy.typing import NDArray
+from equinox.nn import State
+from jax import Array
 
+KeyArray = Array
 # multi-armed bandit arm
-Arm = int | np.int64
+Arm = int | jnp.integer | Array
+# loss from pulling an arm
+Loss = float | jnp.floating | Array
+# function that takes an arm and returns the reward
+Draw = Callable[[State, Arm], tuple[Loss, State]]
+# result of a duel between a pair of arms
+Win = bool | jnp.bool_ | Array
 # function that takes two arms and returns whether the first one won
-Duel = Callable[[Arm, Arm], bool]
-# bandit algorithm
-BanditAlgorithm = Callable[[int, Duel, int], Arm]
+Duel = Callable[[State, Arm, Arm], tuple[Win, State]]
 # history of queries by a bandit algorithm
-History = list[tuple[Arm, Arm]]
+History = Array
+# bandit algorithm
+BanditAlgorithm = Callable[
+    [KeyArray, int, Duel, State, int], tuple[Arm, History]
+]
 # preference matrix
-Preferences = NDArray[np.float64]
+Preferences = Array
+
+
+jit = jax.jit  # type: ignore
+
+if TYPE_CHECKING:
+
+    def jit(f, *args, **kwargs):
+        """Workaround LSP showing JitWrapped on hover."""
+        return wraps(f)(jax.jit(f, *args, **kwargs))
+
+
+def clone_state(state: State) -> State:
+    """Clone the state."""
+    leaves, treedef = jax.tree_util.tree_flatten(state)
+    return jax.tree_util.tree_unflatten(treedef, leaves)
+
+
+def index_dtype(x: Array, unsigned: bool = True):
+    """Return the smallest integer datatype that can represent indices in x."""
+    max_value = lambda dtype: jnp.iinfo(dtype).max  # noqa: E731
+    dtypes = sorted(
+        [jnp.uint8, jnp.uint16, jnp.uint32, jnp.uint64]
+        if unsigned
+        else [jnp.int8, jnp.int16, jnp.int32, jnp.int64],
+        key=max_value,
+    )
+    sizes = list(map(max_value, dtypes))
+    return dtypes[bisect_left(sizes, x.shape[0] - 1)]
 
 
 def valid_preferences(p: Preferences) -> bool:
-    """Validate that the given preference matrix is valid."""
+    """Validate the given preference matrix."""
     assert ((0 <= p) & (p <= 1)).all(), "entries must be valid probabilities"
-    assert np.allclose(p + p.T, 1), "probabilities should be skew-symmetric"
     # this is technically redundant
-    # assert np.allclose(
-    #     np.diagonal(p), 0.5
-    # ), "playing an arm against itself must tie"
+    assert jnp.allclose(
+        jnp.diagonal(p), 0.5
+    ), "playing an arm against itself must tie"
+    assert jnp.allclose(p + p.T, 1), "probabilities should be skew-symmetric"
     return True
-
-
-def count_history(history: History) -> dict[Arm, int]:
-    """Frequency of each arm in the history."""
-    count = {}
-    for pair in history:
-        for arm in pair:
-            count[arm] = count.get(arm, 0) + 1
-    return count
 
 
 def d_kl(p: float, q: float) -> float:
@@ -56,15 +89,16 @@ def d_kl(p: float, q: float) -> float:
 # Copeland functions (see [9, 4, 6])
 
 
-def copeland_scores(p: Preferences, normalize: bool = False) -> np.ndarray:
+@jit
+def copeland_scores(p: Preferences, normalize: bool = False) -> Array:
     """
     Compute the (normalized) Copeland scores for each arm.
 
     The Copeland score for a given arm is the number of
     arms beaten by it (wins with probability > 1/2).
     """
-    scores = np.sum(p > 0.5, axis=1)
-    return scores / (p.shape[1] - 1) if normalize else scores
+    scores = jnp.sum(p > 0.5, axis=1)
+    return jnp.where(normalize, scores / (p.shape[1] - 1), scores)
 
 
 def copeland_winners(p: Preferences) -> np.ndarray:
@@ -107,20 +141,20 @@ def copeland_winner_wins(wins: np.ndarray) -> Arm:
 # Condorcet functions (see [7, 3, 5])
 
 
-def condorcet_winner(p: Preferences) -> Arm | None:
+@jit
+def condorcet_winner(p: Preferences) -> Arm:
     """
     Return the (necessarily unique) Condorcet winner.
 
     A Condorcet winner is defined as an arm which beats all other arms.
     """
     scores = copeland_scores(p)
-    arm = np.argmax(scores)
-    return arm if scores[arm] == p.shape[0] - 1 else None
+    arm = jnp.argmax(scores)
+    return jnp.where(scores[arm] == p.shape[0] - 1, arm, -1)
 
 
-def condorcet_regret(p: Preferences, history: History) -> float:
+@jit
+def condorcet_regret(p: Preferences, history: History) -> Array:
     """Cumulative regret w.r.t. a Condorcet winner."""
     best = condorcet_winner(p)
-    return (
-        sum(p[best, arm1] + p[best, arm2] - 1 for arm1, arm2 in history) / 2
-    )  # type: ignore
+    return jnp.sum(p[best, history[:, 0]] + p[best, history[:, 1]] - 1) / 2
