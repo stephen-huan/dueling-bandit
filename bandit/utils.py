@@ -126,15 +126,12 @@ def copeland_regret(p: Preferences, history: History) -> float:
     )
 
 
-def copeland_winner_wins(wins: np.ndarray) -> Arm:
+def copeland_winner_wins(wins: Array) -> Arm:
     """Return an arbitrary Copeland winner from a number of wins matrix."""
     nums = wins + wins.T
     # define 0/0 := 1/2
-    mask = nums == 0
-    wins[mask] = 1
-    nums[mask] = 2
-    p = wins / nums
-    np.fill_diagonal(p, 0.5)
+    p = jnp.where(nums != 0, wins / nums, 0.5)
+    p = jnp.fill_diagonal(p, 0.5, inplace=False)
     return copeland_winner(p)
 
 

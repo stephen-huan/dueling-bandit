@@ -36,22 +36,6 @@ from scipy.stats import beta
 from .. import utils
 from ..utils import Arm, Duel
 
-
-def naive(K: int, duel: Duel, T: int) -> Arm:
-    """Plays every pair of arms against each other and picks the winner."""
-    wins = np.zeros((K, K), dtype=np.int64)
-    for _ in range(T):
-        # pick the pair that have been played the least
-        nums = wins + wins.T
-        np.fill_diagonal(nums, 2 * T)
-        index = np.argmin(nums)
-        arm1, arm2 = np.unravel_index(index, nums.shape)
-        # play them against each other and update statistics
-        winner, loser = (arm1, arm2) if duel(arm1, arm2) else (arm2, arm1)
-        wins[winner, loser] += 1
-    return utils.copeland_winner_wins(wins)
-
-
 # Beat the Mean Bandit ([7])
 
 
