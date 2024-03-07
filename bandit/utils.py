@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Callable
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from equinox.nn import State
 from jax import Array
+from jaxtyping import ArrayLike
 
 KeyArray = Array
 # multi-armed bandit arm
@@ -71,19 +71,22 @@ def validate_preferences(p: Preferences) -> bool:
     return True
 
 
-def d_kl(p: float, q: float) -> float:
+@jit
+def d_kl(p: Array | float, q: Array | float) -> Array:
     """Kullback-Leibler (KL) divergence between Bernoulli distributions."""
-    if p == 0:
-        return -np.log1p(-q)
-    elif p == 1:
-        return -np.log(q)
-    else:
-        # fmt: off
-        return (
-            p  * (np.log(p) - np.log(q)) +
-            (1 - p) * (np.log1p(-p) - np.log1p(-q))
-        )
-        # fmt: on
+    # 0 log 0 := 0
+    return jnp.where(
+        p == 0,
+        -jnp.log1p(-q),
+        jnp.where(
+            p == 1,
+            -jnp.log(q),
+            (
+                p * (jnp.log(p) - jnp.log(q))
+                + (1 - p) * (jnp.log1p(-p) - jnp.log1p(-q))
+            ),
+        ),
+    )
 
 
 # Copeland functions (see [9, 4, 6])
