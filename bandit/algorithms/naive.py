@@ -46,5 +46,5 @@ def naive(
         )
         return wins, history, state
 
-    wins, *_ = lax.fori_loop(0, T, body_fun, data)
+    wins, history, *_ = lax.fori_loop(0, T, body_fun, data)
     return utils.copeland_winner_wins(wins), history
