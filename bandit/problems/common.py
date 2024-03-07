@@ -1,99 +1,122 @@
 """
 Common utilities between all problem environments.
 """
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
-import numpy as np
+import jax.numpy as jnp
+from equinox import Module, filter_jit
+from equinox.nn import State, StateIndex
+from jax import Array, random
 
 from ..utils import (
     Arm,
     BanditAlgorithm,
     History,
+    KeyArray,
+    Loss,
     Preferences,
     condorcet_winner,
     copeland_winners,
+    validate_preferences,
 )
 
 
-class Problem(ABC):
+class Problem(Module):
     """An instance of a general dueling bandit problem."""
 
     K: int
+    index: StateIndex
 
     @abstractmethod
-    def duel(self, arm1: Arm, arm2: Arm) -> bool:
+    def duel(self, state: State, arm1: Arm, arm2: Arm) -> tuple[Array, State]:
         """Whether arm1 beats arm2."""
 
     @abstractmethod
-    def preference_matrix(self) -> Preferences:
+    def preference_matrix(self, state: State) -> Preferences:
         """Return the preference matrix for the problem."""
 
     @staticmethod
     @abstractmethod
-    def regret_function(p: Preferences, history: History) -> float:
+    def regret_function(p: Preferences, history: History) -> Loss:
         """Cumulative regret for the given prefrence matrix and history."""
 
-    def regret(self, history: History) -> float:
+    def regret(self, state: State, history: History) -> float:
         """Return the regret for a particular history."""
-        return self.regret_function(self.preference_matrix(), history)
+        return float(
+            self.regret_function(self.preference_matrix(state), history)
+        )
 
     @abstractmethod
-    def is_winner(self, arm: Arm) -> bool:
+    def is_winner(self, state: State, arm: Arm) -> bool:
         """Whether the arm is a considered a winner."""
 
     @abstractmethod
-    def shuffle(self) -> None:
+    def shuffle(self, state: State) -> State:
         """Shuffle the internal state to prevent spurious correlations."""
 
 
 # common implementation patterns
 
 
-def duel_matrix(self, arm1: Arm, arm2: Arm) -> bool:
+@filter_jit
+def duel_matrix(
+    self, state: State, arm1: Arm, arm2: Arm
+) -> tuple[Array, State]:
     """A duel for problems defined by explicit preference matrices."""
-    return self.rng.random() < self.p[arm1, arm2]
+    params = state.get(self.index)
+    p = params["p"]
+    rng, subkey = random.split(params["rng"])
+    state = state.set(self.index, {"rng": rng, "p": p})
+    return random.bernoulli(subkey, p[arm1, arm2]), state
 
 
-def preference_matrix_get(self) -> Preferences:
+@filter_jit
+def preference_matrix_get(self, state: State) -> Preferences:
     """Return the preference matrix for the problem."""
-    return self.p
+    return state.get(self.index)["p"]
 
 
-def shuffle_matrix(self) -> None:
+@filter_jit
+def shuffle_matrix(self, state: State) -> State:
     """Shuffle the internal state to prevent spurious correlations."""
-    permute = self.rng.permutation(self.K)
-    self.p = self.p[np.ix_(permute, permute)]
+    params = state.get(self.index)
+    p = params["p"]
+    rng, subkey = random.split(params["rng"])
+    permute = random.permutation(subkey, self.K)
+    p = p[jnp.ix_(permute, permute)]
+    state = state.set(self.index, {"rng": rng, "p": p})
+    return state
 
 
-def is_copeland_winner(self, arm: Arm) -> bool:
+def is_copeland_winner(self, state: State, arm: Arm) -> bool:
     """Whether the arm is a considered a Copeland winner."""
-    return arm in copeland_winners(self.preference_matrix())
+    return bool(copeland_winners(self.preference_matrix(state))[arm])
 
 
-def is_condorcet_winner(self, arm: Arm) -> bool:
+def is_condorcet_winner(self, state: State, arm: Arm) -> bool:
     """Whether the arm is a considered a Condorcet winner."""
-    return arm == condorcet_winner(self.preference_matrix())
+    return bool(arm == condorcet_winner(self.preference_matrix(state)))
 
 
 # useful methods
 
 
 def run_problem(
+    rng: KeyArray,
     problem: Problem,
+    state: State,
     bandit_algorithm: BanditAlgorithm,
     T: int,
     *args,
     **kwargs,
 ) -> tuple[Arm, History]:
     """Run the bandit algorithm on the problem."""
-    history: History = []
-
-    def duel(arm1: Arm, arm2: Arm) -> bool:
-        """Wrap the duel of the problem to track queries."""
-        history.append((arm1, arm2))
-        return problem.duel(arm1, arm2)
-
-    result = bandit_algorithm(problem.K, duel, T, *args, **kwargs)
+    assert validate_preferences(
+        problem.preference_matrix(state)
+    ), "invalid problem setup"
+    result, history = bandit_algorithm(
+        rng, problem.K, problem.duel, state, T, *args, **kwargs
+    )
     assert (
         len(history) == T
     ), f"algorithm used {len(history)} comparisions for time horizon {T}"

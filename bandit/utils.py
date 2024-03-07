@@ -60,7 +60,7 @@ def index_dtype(x: Array, unsigned: bool = True):
     return dtypes[bisect_left(sizes, x.shape[0] - 1)]
 
 
-def valid_preferences(p: Preferences) -> bool:
+def validate_preferences(p: Preferences) -> bool:
     """Validate the given preference matrix."""
     assert ((0 <= p) & (p <= 1)).all(), "entries must be valid probabilities"
     # this is technically redundant
@@ -101,31 +101,31 @@ def copeland_scores(p: Preferences, normalize: bool = False) -> Array:
     return jnp.where(normalize, scores / (p.shape[1] - 1), scores)
 
 
-def copeland_winners(p: Preferences) -> np.ndarray:
+@jit
+def copeland_winners(p: Preferences) -> Array:
     """
-    Return the set of all Copeland winners.
+    Return whether each arm is a Copeland winner.
 
     A Copeland winner is defined as an arm with the highest Copeland score.
     """
     scores = copeland_scores(p)
-    score = np.max(scores)
-    return np.arange(p.shape[0])[scores == score]
+    return scores == jnp.max(scores)
 
 
+@jit
 def copeland_winner(p: Preferences) -> Arm:
     """Return an arbitrary Copeland winner if there are multiple."""
-    return np.argmax(copeland_scores(p))
+    return jnp.argmax(copeland_scores(p))
 
 
-def copeland_regret(p: Preferences, history: History) -> float:
+@jit
+def copeland_regret(p: Preferences, history: History) -> Array:
     """Cumulative regret w.r.t. to Copeland winners."""
     scores = copeland_scores(p, normalize=True)
-    return (
-        len(history) * np.max(scores)
-        - sum(scores[arm1] + scores[arm2] for arm1, arm2 in history) / 2
-    )
+    return history.shape[0] * jnp.max(scores) - jnp.sum(scores[history]) / 2
 
 
+@jit
 def copeland_winner_wins(wins: Array) -> Arm:
     """Return an arbitrary Copeland winner from a number of wins matrix."""
     nums = wins + wins.T
