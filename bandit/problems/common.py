@@ -17,6 +17,7 @@ from ..utils import (
     Preferences,
     condorcet_winner,
     copeland_winners,
+    jit,
     validate_preferences,
 )
 
@@ -76,14 +77,20 @@ def preference_matrix_get(self, state: State) -> Preferences:
     return state.get(self.index)["p"]
 
 
+@jit
+def permute_matrix(rng: KeyArray, x: Array) -> Array:
+    """Permute a matrix."""
+    permute = random.permutation(rng, x.shape[0])
+    return x[jnp.ix_(permute, permute)]
+
+
 @filter_jit
 def shuffle_matrix(self, state: State) -> State:
     """Shuffle the internal state to prevent spurious correlations."""
     params = state.get(self.index)
     p = params["p"]
     rng, subkey = random.split(params["rng"])
-    permute = random.permutation(subkey, self.K)
-    p = p[jnp.ix_(permute, permute)]
+    p = permute_matrix(subkey, p)
     state = state.set(self.index, {"rng": rng, "p": p})
     return state
 

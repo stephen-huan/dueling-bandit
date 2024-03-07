@@ -1,37 +1,38 @@
-import numpy as np
+import jax.numpy as jnp
+from equinox.nn import State, StateIndex
+from jax import random
 
-from ..utils import condorcet_regret
+from ..utils import KeyArray, condorcet_regret
 from .common import (
     Problem,
     duel_matrix,
     is_condorcet_winner,
     preference_matrix_get,
     shuffle_matrix,
+    permute_matrix
 )
 
 
 class CondorcetProblem(Problem):
     """A problem extended with a guaranteed Condorcet winner."""
 
-    def __init__(
-        self,
-        base: Problem,
-        rng: np.random.Generator = np.random.default_rng(),
-    ):
+    def __init__(self, rng: KeyArray, base: tuple[Problem, State]) -> None:
         """Intialize the state of the problem."""
-        self.K = base.K + 1
-        self.rng = rng
+        problem, state = base
+        self.K = problem.K + 1
+        rng, subkey = random.split(rng)
 
-        p = base.preference_matrix()
-        rest = rng.uniform(0.5, 1, (base.K, 1))
-        # fmt: off
-        self.p = np.block([
-            [0.5, rest.T],
-            [1 - rest, p],
-        ])  # type: ignore
-        # fmt: on
+        p = problem.preference_matrix(state)
+        rest = random.uniform(subkey, (problem.K, 1), minval=0.5, maxval=1)
+        p = jnp.block(
+            [
+                [0.5, rest.T],
+                [1 - rest, p],
+            ]
+        )
         # avoid Condorcet winner always placed first
-        self.shuffle()
+        p = permute_matrix(subkey, p)
+        self.index = StateIndex({"rng": rng, "p": p})
 
     duel = duel_matrix
 
