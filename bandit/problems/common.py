@@ -39,6 +39,7 @@ class Problem(Module):
     ) -> tuple[Win, State]:
         """Whether arm1 beats arm2."""
 
+    @filter_jit
     def duel(self, state: State, arm1: Arm, arm2: Arm) -> tuple[Win, State]:
         """Whether arm1 beats arm2."""
         return self.duel_function(self.index, state, arm1, arm2)

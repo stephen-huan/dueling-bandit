@@ -1,10 +1,15 @@
 import jax.numpy as jnp
-from equinox import filter_jit
-from equinox.nn import State, StateIndex
-from jax import Array, random
+from equinox.nn import StateIndex
+from jax import random
 
-from ..utils import Arm, KeyArray, Preferences, condorcet_regret
-from .common import Problem, is_condorcet_winner
+from ..utils import KeyArray, condorcet_regret
+from .common import (
+    Problem,
+    duel_matrix,
+    is_condorcet_winner,
+    preference_matrix_get,
+    shuffle_matrix,
+)
 
 
 class RankingProblem(Problem):
@@ -23,38 +28,21 @@ class RankingProblem(Problem):
     ) -> None:
         """Intialize the state of the problem."""
         self.K = K
+
         rng, subkey = random.split(rng)
         ratings = random.uniform(
             subkey, (K,), minval=rating_min, maxval=rating_max
         )
-        self.index = StateIndex((rng, ratings))
+        p = jnp.reciprocal(1 + jnp.exp(ratings - ratings[:, jnp.newaxis]))
 
-    @staticmethod
-    @filter_jit
-    def duel_function(
-        index: StateIndex, state: State, arm1: Arm, arm2: Arm
-    ) -> tuple[Array, State]:
-        """Whether arm1 beats arm2."""
-        rng, ratings = state.get(index)
-        rng, subkey = random.split(rng)
-        p = jnp.reciprocal(1 + jnp.exp(ratings[arm2] - ratings[arm1]))
-        state = state.set(index, (rng, ratings))
-        return random.bernoulli(subkey, p), state
+        self.index = StateIndex({"rng": rng, "p": p})
 
-    @filter_jit
-    def preference_matrix(self, state: State) -> Preferences:
-        """Return the preference matrix for the problem."""
-        _, ratings = state.get(self.index)
-        return jnp.reciprocal(1 + jnp.exp(ratings - ratings[:, jnp.newaxis]))
+    duel_function = staticmethod(duel_matrix)
+
+    preference_matrix = preference_matrix_get
 
     regret_function = staticmethod(condorcet_regret)
 
     is_winner = is_condorcet_winner
 
-    @filter_jit
-    def shuffle(self, state: State) -> State:
-        """Shuffle the internal state to prevent spurious correlations."""
-        rng, ratings = state.get(self.index)
-        rng, subkey = random.split(rng)
-        ratings = random.permutation(subkey, ratings)
-        return state.set(self.index, (rng, ratings))
+    shuffle = shuffle_matrix
