@@ -1,4 +1,5 @@
-from .algorithms import btm_online, scb
+from .algorithms import scb
+from .btm import btm_online
 from .d_ts import d_ts
 from .naive import naive
 from .vdb import vdb, vdb_ind

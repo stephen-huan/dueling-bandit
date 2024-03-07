@@ -69,6 +69,18 @@ def index_dtype(x: Array, unsigned: bool = True):
 
 
 @jit
+def max_masked(x: Array, mask: Array) -> Array:
+    """Return the max of x, restricted to the indices in mask."""
+    return jnp.max(jnp.where(mask, x, -jnp.inf))
+
+
+@jit
+def min_masked(x: Array, mask: Array) -> Array:
+    """Return the min of x, restricted to the indices in mask."""
+    return jnp.min(jnp.where(mask, x, jnp.inf))
+
+
+@jit
 def argmax_masked(rng: KeyArray, x: Array, mask: Array) -> Array:
     """Return the masked argmax of x, breaking ties randomly."""
     perm = random.permutation(rng, x.shape[0])
