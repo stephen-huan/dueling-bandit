@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Callable, Concatenate, ParamSpec, TypeVar
 import jax
 import jax.numpy as jnp
 from equinox.nn import State
-from jax import Array
+from jax import Array, random
 
 KeyArray = Array
 # multi-armed bandit arm
@@ -66,6 +66,20 @@ def index_dtype(x: Array, unsigned: bool = True):
     )
     sizes = list(map(max_value, dtypes))
     return dtypes[bisect_left(sizes, x.shape[0] - 1)]
+
+
+@jit
+def argmax_masked(rng: KeyArray, x: Array, mask: Array) -> Array:
+    """Return the masked argmax of x, breaking ties randomly."""
+    perm = random.permutation(rng, x.shape[0])
+    return perm[jnp.argmax(jnp.where(mask, x, -jnp.inf)[perm])]
+
+
+@jit
+def argmin_masked(rng: KeyArray, x: Array, mask: Array) -> Array:
+    """Return the masked argmin of x, breaking ties randomly."""
+    perm = random.permutation(rng, x.shape[0])
+    return perm[jnp.argmin(jnp.where(mask, x, jnp.inf)[perm])]
 
 
 def validate_preferences(p: Preferences) -> bool:

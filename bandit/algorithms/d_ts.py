@@ -5,13 +5,13 @@ import jax.numpy as jnp
 from jax import Array, lax, random, vmap
 
 from .. import utils
-from ..utils import Arm, Duel, KeyArray, S, jit
+from ..utils import Arm, Duel, KeyArray, S, argmax_masked, argmin_masked, jit
 
 # Double Thompson Sampling ([6])
 
 
 @jit
-def d_ts_plus(theta: Array) -> Arm:
+def d_ts_plus(rng: KeyArray, theta: Array) -> Arm:
     """Return the arm that minimizes regret (corollary 1 of [6])."""
     scores = utils.copeland_scores(theta)
     score = jnp.max(scores)
@@ -25,7 +25,7 @@ def d_ts_plus(theta: Array) -> Arm:
         ).sum()
 
     regrets = vmap(regret)(jnp.arange(scores.shape[0]))
-    return jnp.argmin(jnp.where(winners, regrets, jnp.inf))
+    return argmin_masked(rng, regrets, winners)
 
 
 @partial(jit, static_argnums=(1, 2, 4, 6))
@@ -49,7 +49,7 @@ def d_ts(
     def body_fun(t: int, data: Data) -> Data:
         """Inner loop."""
         B, state, rng = data
-        rng, subkey1, subkey2, subkey3 = random.split(rng, num=4)
+        rng, subkey1, subkey2, subkey3, subkey4 = random.split(rng, num=5)
         # phase 1: choose the first candidate
         total = B + B.T
         std = jnp.sqrt(alpha * jnp.log(t) / total)
@@ -72,16 +72,14 @@ def d_ts(
         theta = jnp.fill_diagonal(theta, 0.5, inplace=False)
         # choose only from C to eliminate non-winner arms; break ties randomly
         if not plus:
-            scores = jnp.where(C, utils.copeland_scores(theta), -1)
-            perm = random.permutation(subkey2, K)
-            arm1 = perm[jnp.argmax(scores[perm])]
+            arm1 = argmax_masked(subkey2, utils.copeland_scores(theta), C)
         else:
-            arm1 = d_ts_plus(theta)
+            arm1 = d_ts_plus(subkey2, theta)
         # phase 2: choose the second candidate
         theta2 = random.beta(subkey3, B[:, arm1] + 1, B[arm1, :] + 1)
         theta2 = theta2.at[arm1].set(0.5)
         # choosing only from uncertain pairs
-        arm2 = jnp.argmax(jnp.where(L[:, arm1] <= 0.5, theta2, -1))
+        arm2 = argmax_masked(subkey4, theta2, L[:, arm1] <= 0.5)
         # compare the pair, observe the outcome, and update B
         outcome, state = duel(state, arm1, arm2)
         B = lax.cond(
