@@ -15,6 +15,7 @@ from ..utils import (
     KeyArray,
     Loss,
     Preferences,
+    Win,
     condorcet_winner,
     copeland_winners,
     jit,
@@ -41,14 +42,13 @@ class Problem(Module):
     def regret_function(p: Preferences, history: History) -> Loss:
         """Cumulative regret for the given prefrence matrix and history."""
 
-    def regret(self, state: State, history: History) -> float:
+    @filter_jit
+    def regret(self, state: State, history: History) -> Loss:
         """Return the regret for a particular history."""
-        return float(
-            self.regret_function(self.preference_matrix(state), history)
-        )
+        return self.regret_function(self.preference_matrix(state), history)
 
     @abstractmethod
-    def is_winner(self, state: State, arm: Arm) -> bool:
+    def is_winner(self, state: State, arm: Arm) -> Win:
         """Whether the arm is a considered a winner."""
 
     @abstractmethod
@@ -95,14 +95,16 @@ def shuffle_matrix(self, state: State) -> State:
     return state
 
 
-def is_copeland_winner(self, state: State, arm: Arm) -> bool:
+@filter_jit
+def is_copeland_winner(self, state: State, arm: Arm) -> Array:
     """Whether the arm is a considered a Copeland winner."""
-    return bool(copeland_winners(self.preference_matrix(state))[arm])
+    return copeland_winners(self.preference_matrix(state))[arm]
 
 
-def is_condorcet_winner(self, state: State, arm: Arm) -> bool:
+@filter_jit
+def is_condorcet_winner(self, state: State, arm: Arm) -> Win:
     """Whether the arm is a considered a Condorcet winner."""
-    return bool(arm == condorcet_winner(self.preference_matrix(state)))
+    return arm == condorcet_winner(self.preference_matrix(state))
 
 
 # useful methods

@@ -8,7 +8,7 @@ from jax import random
 
 from bandit import problems
 from bandit.utils import clone_state
-from setups.setup3 import Ts, alg_list, prob_list, rng, setup_name, trials
+from setups.setup1 import Ts, alg_list, prob_list, rng, setup_name, trials
 
 jnp.set_printoptions(precision=3, suppress=True)
 
@@ -35,11 +35,12 @@ if __name__ == "__main__":
                     k, history = problems.run_problem(
                         subkey, problem, clone_state(state), algorithm, T
                     )
+                    regret = problem.regret(state, history)
                     data["problem"].append(problem_name)
                     data["algorithm"].append(algorithm_name)
                     data["time"].append(int(T))
-                    data["regret"].append(problem.regret(state, history))
-                    data["winner"].append(problem.is_winner(state, k))
+                    data["regret"].append(float(regret))
+                    data["winner"].append(bool(problem.is_winner(state, k)))
     data = pd.DataFrame(data)
     # print(data)
 
