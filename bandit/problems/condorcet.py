@@ -34,7 +34,7 @@ class CondorcetProblem(Problem):
         p = permute_matrix(subkey, p)
         self.index = StateIndex({"rng": rng, "p": p})
 
-    duel = duel_matrix
+    duel_function = staticmethod(duel_matrix)
 
     preference_matrix = preference_matrix_get
 

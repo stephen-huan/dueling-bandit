@@ -29,13 +29,16 @@ class RankingProblem(Problem):
         )
         self.index = StateIndex((rng, ratings))
 
+    @staticmethod
     @filter_jit
-    def duel(self, state: State, arm1: Arm, arm2: Arm) -> tuple[Array, State]:
+    def duel_function(
+        index: StateIndex, state: State, arm1: Arm, arm2: Arm
+    ) -> tuple[Array, State]:
         """Whether arm1 beats arm2."""
-        rng, ratings = state.get(self.index)
+        rng, ratings = state.get(index)
         rng, subkey = random.split(rng)
         p = jnp.reciprocal(1 + jnp.exp(ratings[arm2] - ratings[arm1]))
-        state = state.set(self.index, (rng, ratings))
+        state = state.set(index, (rng, ratings))
         return random.bernoulli(subkey, p), state
 
     @filter_jit

@@ -29,7 +29,7 @@ class RandomProblem(Problem):
 
         self.index = StateIndex({"rng": rng, "p": p})
 
-    duel = duel_matrix
+    duel_function = staticmethod(duel_matrix)
 
     preference_matrix = preference_matrix_get
 
