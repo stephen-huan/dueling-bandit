@@ -1,6 +1,8 @@
-import numpy as np
+import jax.numpy as jnp
+from equinox.nn import StateIndex
+from jax import random
 
-from ..utils import copeland_regret
+from ..utils import KeyArray, copeland_regret
 from .common import (
     Problem,
     duel_matrix,
@@ -13,21 +15,19 @@ from .common import (
 class RandomProblem(Problem):
     """A completely random problem."""
 
-    def __init__(
-        self,
-        K: int,
-        rng: np.random.Generator = np.random.default_rng(),
-    ):
+    def __init__(self, rng: KeyArray, K: int) -> None:
         """Intialize the state of the problem."""
         self.K = K
-        self.rng = rng
 
-        self.p = np.zeros((K, K))
-        lower = np.tril_indices(n=K, k=-1)
-        self.p[lower] = rng.uniform(0, 1, size=lower[0].shape[0])
-        self.p = self.p + (1 - self.p.T)
-        self.p[lower] -= 1
-        np.fill_diagonal(self.p, 0.5)
+        p = jnp.zeros((K, K))
+        lower = jnp.tril_indices(n=K, k=-1)
+        rng, subkey = random.split(rng)
+        p = p.at[lower].set(random.uniform(subkey, (lower[0].shape[0],)))
+        p = p + (1 - p.T)
+        p = p.at[lower].add(-1)
+        p = jnp.fill_diagonal(p, 0.5, inplace=False)
+
+        self.index = StateIndex({"rng": rng, "p": p})
 
     duel = duel_matrix
 
