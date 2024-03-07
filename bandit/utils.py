@@ -14,18 +14,18 @@ KeyArray = Array
 Arm = int | jnp.integer | Array
 # loss from pulling an arm
 Loss = float | jnp.floating | Array
+# general state (like equinox's State)
+S = TypeVar("S")
 # function that takes an arm and returns the reward
-Draw = Callable[[State, Arm], tuple[Loss, State]]
+Draw = Callable[[S, Arm], tuple[Loss, S]]
 # result of a duel between a pair of arms
 Win = bool | jnp.bool_ | Array
 # function that takes two arms and returns whether the first one won
-Duel = Callable[[State, Arm, Arm], tuple[Win, State]]
+Duel = Callable[[S, Arm, Arm], tuple[Win, S]]
 # history of queries by a bandit algorithm
 History = Array
 # bandit algorithm
-BanditAlgorithm = Callable[
-    [KeyArray, int, Duel, State, int], tuple[Arm, History]
-]
+BanditAlgorithm = Callable[[KeyArray, int, Duel, S, int], tuple[Arm, S]]
 # preference matrix
 Preferences = Array
 
