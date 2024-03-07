@@ -1,6 +1,9 @@
-import numpy as np
+import jax.numpy as jnp
+from equinox import filter_jit
+from equinox.nn import State, StateIndex
+from jax import Array, random
 
-from ..utils import Arm, Preferences, condorcet_regret
+from ..utils import Arm, KeyArray, Preferences, condorcet_regret
 from .common import Problem, is_condorcet_winner
 
 
@@ -16,31 +19,39 @@ class RankingProblem(Problem):
     """
 
     def __init__(
-        self,
-        K: int,
-        rating_max: float,
-        rating_min: float = 0,
-        rng: np.random.Generator = np.random.default_rng(),
-    ):
+        self, rng: KeyArray, K: int, rating_max: float, rating_min: float = 0
+    ) -> None:
         """Intialize the state of the problem."""
         self.K = K
-        self.rng = rng
+        rng, subkey = random.split(rng)
+        ratings = random.uniform(
+            subkey, (K,), minval=rating_min, maxval=rating_max
+        )
+        self.index = StateIndex((rng, ratings))
 
-        self.ratings = rng.uniform(rating_min, rating_max, K)
-
-    def duel(self, arm1: Arm, arm2: Arm) -> bool:
+    @filter_jit
+    def duel(self, state: State, arm1: Arm, arm2: Arm) -> tuple[Array, State]:
         """Whether arm1 beats arm2."""
-        p = 1 / (1 + np.exp(self.ratings[arm2] - self.ratings[arm1]))
-        return self.rng.random() < p
+        rng, ratings = state.get(self.index)
+        rng, subkey = random.split(rng)
+        p = jnp.reciprocal(1 + jnp.exp(ratings[arm2] - ratings[arm1]))
+        state = state.set(self.index, (rng, ratings))
+        return random.bernoulli(subkey, p), state
 
-    def preference_matrix(self) -> Preferences:
+    @filter_jit
+    def preference_matrix(self, state: State) -> Preferences:
         """Return the preference matrix for the problem."""
-        return 1 / (1 + np.exp(self.ratings - self.ratings[:, np.newaxis]))
+        _, ratings = state.get(self.index)
+        return jnp.reciprocal(1 + jnp.exp(ratings - ratings[:, jnp.newaxis]))
 
     regret_function = staticmethod(condorcet_regret)
 
     is_winner = is_condorcet_winner
 
-    def shuffle(self) -> None:
+    @filter_jit
+    def shuffle(self, state: State) -> State:
         """Shuffle the internal state to prevent spurious correlations."""
-        self.rng.shuffle(self.ratings)
+        rng, ratings = state.get(self.index)
+        rng, subkey = random.split(rng)
+        ratings = random.permutation(subkey, ratings)
+        return state.set(self.index, (rng, ratings))
