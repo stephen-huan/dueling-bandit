@@ -2,11 +2,10 @@ from functools import partial
 from typing import TypeAlias
 
 import jax.numpy as jnp
-from equinox.nn import State
 from jax import Array, lax, random, vmap
 
 from .. import utils
-from ..utils import Arm, Duel, History, KeyArray, index_dtype, jit
+from ..utils import Arm, Duel, KeyArray, S, jit
 
 # Double Thompson Sampling ([6])
 
@@ -34,24 +33,22 @@ def d_ts(
     rng: KeyArray,
     K: int,
     duel: Duel,
-    state: State,
+    state: S,
     T: int,
     # [6] proves with alpha = 0.5 (theorem 1) and uses alpha = 0.51 (section 5)
     # [5] recommends alpha = 0.6 in section 7
     alpha: float = 0.51,
     plus: bool = True,
-) -> tuple[Arm, History]:
+) -> tuple[Arm, S]:
     """The Double Thompson Sampling (D-TS) algorithm 1 of [6]."""
     B = jnp.zeros((K, K))
-    int_dtype = index_dtype(jnp.arange(K))
-    history = jnp.zeros((T, 2), dtype=int_dtype)
 
-    Data: TypeAlias = tuple[Array, History, KeyArray, State]  # type: ignore
-    data = (B, history, rng, state)
+    Data: TypeAlias = tuple[Array, S, KeyArray]  # type: ignore
+    data = (B, state, rng)
 
     def body_fun(t: int, data: Data) -> Data:
         """Inner loop."""
-        B, history, rng, state = data
+        B, state, rng = data
         rng, subkey1, subkey2, subkey3 = random.split(rng, num=4)
         # phase 1: choose the first candidate
         total = B + B.T
@@ -86,8 +83,6 @@ def d_ts(
         # choosing only from uncertain pairs
         arm2 = jnp.argmax(jnp.where(L[:, arm1] <= 0.5, theta2, -1))
         # compare the pair, observe the outcome, and update B
-        history = history.at[t, 0].set(int_dtype(arm1))
-        history = history.at[t, 1].set(int_dtype(arm2))
         outcome, state = duel(state, arm1, arm2)
         B = lax.cond(
             outcome,
@@ -95,7 +90,7 @@ def d_ts(
             lambda B, loser, winner: B.at[winner, loser].add(1),
             *(B, arm1, arm2),
         )
-        return B, history, rng, state
+        return B, state, rng
 
-    B, history, *_ = lax.fori_loop(1, T + 1, body_fun, data)
-    return utils.copeland_winner_wins(B), history
+    B, state, *_ = lax.fori_loop(1, T + 1, body_fun, data)
+    return utils.copeland_winner_wins(B), state

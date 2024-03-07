@@ -2,10 +2,9 @@ from functools import partial
 from typing import TypeAlias
 
 import jax.numpy as jnp
-from equinox.nn import State
 from jax import Array, lax, random
 
-from ..utils import Draw, History, KeyArray, Loss, index_dtype, jit
+from ..utils import Draw, KeyArray, Loss, S, jit
 
 # Tsallis-INF methods ([8])
 
@@ -113,34 +112,29 @@ def loss_estimator(loss: Loss, w_i: Array, lr: Array, rv: bool) -> Array:
 
 @partial(jit, static_argnums=(1, 2, 4))
 def tsallis_inf(
-    rng: KeyArray, K: int, draw: Draw, state: State, T: int, rv: bool = True
-) -> tuple[Array, History]:
+    rng: KeyArray, K: int, draw: Draw, state: S, T: int, rv: bool = True
+) -> tuple[Array, S]:
     """The Tsallis-INF multi-armed bandit algorithm, algorithm 1 of [8]."""
     losses = jnp.zeros(K)
-    int_dtype = index_dtype(jnp.arange(K))
-    history = jnp.zeros(T, dtype=int_dtype)
     # warm start
     x = -jnp.sqrt(K)
-    Data: TypeAlias = tuple[  # type: ignore
-        Array, History, KeyArray, State, Array
-    ]
-    data = (losses, history, rng, state, x)
+    Data: TypeAlias = tuple[Array, S, KeyArray, Array]  # type: ignore
+    data = (losses, state, rng, x)
 
     def body_fun(t: int, data: Data) -> Data:
         """Inner Online Mirror Descent (OMD) loop."""
-        losses, history, rng, state, x = data
+        losses, state, rng, x = data
         rng, subkey = random.split(rng, num=2)
         # sample arm from distribution
         lr = learning_rate(t, rv)
         x, w = omd_newton(x, losses, lr)
         arm = random.choice(subkey, K, p=w)
-        history = history.at[t - 1].set(int_dtype(arm))
         # observe outcome
         loss, state = draw(state, arm)
         # update cumulative losses with unbiased loss
         unbiased_loss = loss_estimator(loss, w[arm], lr, rv)
         losses = losses.at[arm].add(unbiased_loss)
-        return losses, history, rng, state, x
+        return losses, state, rng, x
 
-    losses, history, *_ = lax.fori_loop(1, T + 1, body_fun, data)
-    return losses, history
+    losses, state, *_ = lax.fori_loop(1, T + 1, body_fun, data)
+    return losses, state
