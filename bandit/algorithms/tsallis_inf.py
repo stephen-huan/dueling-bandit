@@ -6,12 +6,12 @@ from jax import Array, lax, random
 
 from ..utils import Draw, KeyArray, Loss, S, jit
 
-# Tsallis-INF methods ([8])
+# Tsallis-INF ([11])
 
 
 @jit
 def learning_rate(t: int, rv: bool) -> Array:
-    """Return the learning rate (theorem 1 of [8])."""
+    """Return the learning rate (theorem 1 of [11])."""
     return jnp.where(
         rv,
         4 * jnp.sqrt(jnp.reciprocal(t)),
@@ -70,7 +70,7 @@ def omd_newton(
     lr: Array,
     eps: float | Array = 1e-12,
 ) -> tuple[Array, Array]:
-    """Newton's method for the weights, algorithm 2 of [8]."""
+    """Newton's method for the weights, algorithm 2 of [11]."""
     Data: TypeAlias = tuple[Array, Array]  # type: ignore
 
     def body_fun(data: Data) -> Data:
@@ -114,7 +114,7 @@ def loss_estimator(loss: Loss, w_i: Array, lr: Array, rv: bool) -> Array:
 def tsallis_inf(
     rng: KeyArray, K: int, draw: Draw, state: S, T: int, rv: bool = True
 ) -> tuple[Array, S]:
-    """The Tsallis-INF multi-armed bandit algorithm, algorithm 1 of [8]."""
+    """The Tsallis-INF multi-armed bandit algorithm, algorithm 1 of [11]."""
     losses = jnp.zeros(K)
     # warm start
     x = -jnp.sqrt(K)

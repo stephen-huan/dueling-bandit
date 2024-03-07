@@ -16,7 +16,7 @@ from ..utils import (
     min_masked,
 )
 
-# Beat the Mean Bandit ([7])
+# Beat the Mean Bandit ([10])
 
 
 @jit
@@ -39,7 +39,7 @@ def btm(
     c: Callable[[Array], Array],
     N: float = jnp.inf,
 ) -> tuple[Arm, S, int]:
-    """The Beat the Mean Bandit (BTM) algorithm 1 of [7]."""
+    """The Beat the Mean Bandit (BTM) algorithm 1 of [10]."""
     W = jnp.ones(K, dtype=jnp.bool_)
     wins = jnp.zeros((K, K))
     t = 0
@@ -102,7 +102,7 @@ def btm_online(
     T: int,
     gamma: float = 1,
 ) -> tuple[Arm, S]:
-    """The Beat the Mean (online) algorithm 2 of [7]."""
+    """The Beat the Mean (online) algorithm 2 of [10]."""
     delta = jnp.reciprocal(2 * T * K)
 
     def c(n: Array) -> Array:

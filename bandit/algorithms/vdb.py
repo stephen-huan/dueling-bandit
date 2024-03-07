@@ -7,7 +7,7 @@ from jax import Array, lax, random
 from ..utils import Arm, Duel, KeyArray, S, jit
 from .tsallis_inf import learning_rate, loss_estimator, omd_newton
 
-# Versatile Dueling Bandits (VDB) methods ([5])
+# Versatile Dueling Bandits (VDB) ([8])
 
 
 @partial(jit, static_argnums=(1, 2, 4))
@@ -19,7 +19,7 @@ def vdb_ind(
     T: int,
     rv: bool = True,
 ) -> tuple[Arm, S]:
-    """The Versatile-DB (VDB) algorithm 3 of [5]."""
+    """The Versatile-DB (VDB) algorithm 3 of [8]."""
     losses = jnp.zeros((2, K))
     x = [-jnp.sqrt(K)] * 2
 
@@ -61,7 +61,7 @@ def vdb(
     T: int,
     rv: bool = True,
 ) -> tuple[Arm, S]:
-    """The Versatile-DB (VDB) algorithm 3 of [5], remark 2."""
+    """The Versatile-DB (VDB) algorithm 3 of [8], remark 2."""
     losses = jnp.zeros(K)
     x = -jnp.sqrt(K)
 

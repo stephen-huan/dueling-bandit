@@ -7,12 +7,12 @@ from jax import Array, lax, random, vmap
 from .. import utils
 from ..utils import Arm, Duel, KeyArray, S, argmax_masked, argmin_masked, jit
 
-# Double Thompson Sampling ([6])
+# Double Thompson Sampling ([9])
 
 
 @jit
 def d_ts_plus(rng: KeyArray, theta: Array) -> Arm:
-    """Return the arm that minimizes regret (corollary 1 of [6])."""
+    """Return the arm that minimizes regret (corollary 1 of [9])."""
     scores = utils.copeland_scores(theta)
     score = jnp.max(scores)
     winners = utils.copeland_winners(theta)
@@ -35,12 +35,12 @@ def d_ts(
     duel: Duel,
     state: S,
     T: int,
-    # [6] proves with alpha = 0.5 (theorem 1) and uses alpha = 0.51 (section 5)
+    # [9] proves with alpha = 0.5 (theorem 1) and uses alpha = 0.51 (section 5)
     # [5] recommends alpha = 0.6 in section 7
     alpha: float = 0.51,
     plus: bool = True,
 ) -> tuple[Arm, S]:
-    """The Double Thompson Sampling (D-TS) algorithm 1 of [6]."""
+    """The Double Thompson Sampling (D-TS) algorithm 1 of [9]."""
     B = jnp.zeros((K, K))
 
     Data: TypeAlias = tuple[Array, S, KeyArray]  # type: ignore
