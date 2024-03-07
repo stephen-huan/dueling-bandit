@@ -2,14 +2,12 @@
 Helper library for shared types and utilites.
 """
 from bisect import bisect_left
-from functools import wraps
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Concatenate, ParamSpec, TypeVar
 
 import jax
 import jax.numpy as jnp
 from equinox.nn import State
 from jax import Array
-from jaxtyping import ArrayLike
 
 KeyArray = Array
 # multi-armed bandit arm
@@ -35,10 +33,20 @@ Preferences = Array
 jit = jax.jit  # type: ignore
 
 if TYPE_CHECKING:
+    P1 = ParamSpec("P1")
+    P2 = ParamSpec("P2")
+    T2 = TypeVar("T2")
+    Fun = Callable[P2, T2]
 
-    def jit(f, *args, **kwargs):
+    def wrap(
+        _: Callable[Concatenate[Callable, P1], Callable]
+    ) -> Callable[[Callable], Callable[Concatenate[Fun, P1], Fun]]:
         """Workaround LSP showing JitWrapped on hover."""
-        return wraps(f)(jax.jit(f, *args, **kwargs))
+        ...
+
+    @wrap(jax.jit)
+    def jit():
+        ...
 
 
 def clone_state(state: State) -> State:
