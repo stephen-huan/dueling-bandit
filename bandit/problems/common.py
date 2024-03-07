@@ -2,10 +2,10 @@
 Common utilities between all problem environments.
 """
 from abc import abstractmethod
-from typing import TypeAlias
+from typing import Callable
 
 import jax.numpy as jnp
-from equinox import Module, filter_jit
+from equinox import Module, Partial, filter_jit
 from equinox.nn import State, StateIndex
 from jax import Array, random
 
@@ -16,7 +16,6 @@ from ..utils import (
     KeyArray,
     Loss,
     Preferences,
-    S,
     Win,
     condorcet_winner,
     copeland_winners,
@@ -33,7 +32,7 @@ class Problem(Module):
     index: StateIndex
 
     @abstractmethod
-    def duel(self, state: S, arm1: Arm, arm2: Arm) -> tuple[Array, S]:
+    def duel(self, state: State, arm1: Arm, arm2: Arm) -> tuple[Array, State]:
         """Whether arm1 beats arm2."""
 
     @abstractmethod
@@ -113,6 +112,22 @@ def is_condorcet_winner(self, state: State, arm: Arm) -> Win:
 # useful methods
 
 
+@filter_jit
+def history_duel(
+    problem: Problem,
+    int_dtype: Callable,
+    data: tuple[History, int, State],
+    arm1: Arm,
+    arm2: Arm,
+) -> tuple[Array, tuple[History, int, State]]:
+    """Wrap the duel of the problem to track queries."""
+    history, t, state = data
+    history = history.at[t, 0].set(int_dtype(arm1))
+    history = history.at[t, 1].set(int_dtype(arm2))
+    outcome, state = problem.duel(state, arm1, arm2)
+    return outcome, (history, t + 1, state)
+
+
 def run_problem(
     rng: KeyArray,
     problem: Problem,
@@ -127,18 +142,8 @@ def run_problem(
 
     int_dtype = index_dtype(jnp.arange(problem.K))
     history = jnp.zeros((T, 2), dtype=int_dtype)
-    Data: TypeAlias = tuple[History, int, State]  # type: ignore
     data = (history, 0, state)
-
-    @jit
-    def duel(data: Data, arm1: Arm, arm2: Arm) -> tuple[Array, Data]:
-        """Wrap the duel of the problem to track queries."""
-        history, t, state = data
-        history = history.at[t, 0].set(int_dtype(arm1))
-        history = history.at[t, 1].set(int_dtype(arm2))
-        outcome, state = problem.duel(state, arm1, arm2)
-        return outcome, (history, t + 1, state)
-
+    duel = Partial(history_duel, problem, int_dtype)
     result, (history, t, _) = bandit_algorithm(rng, problem.K, duel, data, T)
     assert t == T, f"algorithm used {t} comparisions for time horizon {T}"
     return result, history
