@@ -1,17 +1,21 @@
 from pathlib import Path
 
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
+from jax import random
 
 from bandit import problems
-from setups.setup3 import Ts, alg_list, prob_list, setup_name, trials
+from bandit.utils import clone_state
+from setups.setup3 import Ts, alg_list, prob_list, rng, setup_name, trials
 
-np.set_printoptions(precision=3, suppress=True)
+jnp.set_printoptions(precision=3, suppress=True)
+
 sns.set_theme(context="paper", style="darkgrid")
 
 Path("figures").mkdir(parents=True, exist_ok=True)
+
 
 if __name__ == "__main__":
     data = {
@@ -22,17 +26,20 @@ if __name__ == "__main__":
         "winner": [],
     }
 
-    for problem_name, problem in prob_list.items():
+    for problem_name, (problem, state) in prob_list.items():
         for algorithm_name, algorithm in alg_list.items():
             for T in Ts:
                 for _ in range(trials):
-                    problem.shuffle()
-                    k, history = problems.run_problem(problem, algorithm, T)
+                    state = problem.shuffle(state)
+                    rng, subkey = random.split(rng)
+                    k, history = problems.run_problem(
+                        subkey, problem, clone_state(state), algorithm, T
+                    )
                     data["problem"].append(problem_name)
                     data["algorithm"].append(algorithm_name)
-                    data["time"].append(T)
-                    data["regret"].append(problem.regret(history))
-                    data["winner"].append(problem.is_winner(k))
+                    data["time"].append(int(T))
+                    data["regret"].append(problem.regret(state, history))
+                    data["winner"].append(problem.is_winner(state, k))
     data = pd.DataFrame(data)
     # print(data)
 
