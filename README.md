@@ -59,18 +59,18 @@ See the following references (not all of these are currently implemented).
 
 ### Setup 1
 
-![Setup 1 regret](./results/regret_1.png)
+![Setup 1 regret](./figures/regret_1.png)
 
 ### Setup 2
 
-![Setup 2 regret](./results/regret_2.png)
+![Setup 2 regret](./figures/regret_2.png)
 
 ### Setup 3
 
-![Setup 3 regret](./results/regret_3.png)
+![Setup 3 regret](./figures/regret_3.png)
 
-![Setup 3 win percentage](./results/winner_3.png)
+![Setup 3 win percentage](./figures/winner_3.png)
 
 ### Setup 4
 
-![Setup 4 win percentage](./results/winner_4.png)
+![Setup 4 win percentage](./figures/winner_4.png)
