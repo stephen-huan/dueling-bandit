@@ -28,8 +28,12 @@ if __name__ == "__main__":
 
     for problem_name, (problem, state) in prob_list.items():
         for algorithm_name, algorithm in alg_list.items():
-            for T in Ts:
-                for _ in range(trials):
+            if isinstance(algorithm, tuple):
+                algorithm, times, tries = algorithm
+            else:
+                times, tries = Ts, trials
+            for T in times:
+                for _ in range(tries):
                     state = problem.shuffle(state)
                     rng, subkey = random.split(rng)
                     k, history = problems.run_problem(
@@ -38,7 +42,9 @@ if __name__ == "__main__":
                     regret = problem.regret(state, history)
                     data["problem"].append(problem_name)
                     data["algorithm"].append(algorithm_name)
-                    data["time"].append(history.shape[0])
+                    t = history.shape[0]
+                    t = 25 * jnp.ceil(t / 25)
+                    data["time"].append(int(t))
                     data["regret"].append(float(regret))
                     data["winner"].append(bool(problem.is_winner(state, k)))
     data = pd.DataFrame(data)
