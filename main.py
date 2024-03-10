@@ -38,7 +38,7 @@ if __name__ == "__main__":
                     regret = problem.regret(state, history)
                     data["problem"].append(problem_name)
                     data["algorithm"].append(algorithm_name)
-                    data["time"].append(int(T))
+                    data["time"].append(history.shape[0])
                     data["regret"].append(float(regret))
                     data["winner"].append(bool(problem.is_winner(state, k)))
     data = pd.DataFrame(data)

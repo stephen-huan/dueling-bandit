@@ -155,5 +155,5 @@ def run_problem(
     problem_duel = Partial(problem.duel_function, problem.index)
     duel = Partial(history_duel, problem_duel, int_dtype)
     result, (history, t, _) = bandit_algorithm(rng, problem.K, duel, data, T)
-    assert t == T, f"algorithm used {t} comparisions for time horizon {T}"
-    return result, history
+    assert t <= T, f"algorithm used {t} comparisions for time horizon {T}"
+    return result, history[:t]

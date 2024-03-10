@@ -101,6 +101,7 @@ def btm_online(
     state: S,
     T: int,
     gamma: float = 1,
+    exact_T: bool = True,
 ) -> tuple[Arm, S]:
     """The Beat the Mean (online) algorithm 2 of [10]."""
     delta = jnp.reciprocal(2 * T * K)
@@ -114,7 +115,12 @@ def btm_online(
     # explore
     b, state, t = btm(rng, K, duel, state, T, c)
     # exploit
-    state = lax.fori_loop(
-        0, T - t, lambda _, state: duel(state, b, b)[1], state
+    state = lax.cond(
+        exact_T,
+        lambda state: lax.fori_loop(
+            0, T - t, lambda _, state: duel(state, b, b)[1], state
+        ),
+        lambda state: state,
+        state,
     )
     return b, state
