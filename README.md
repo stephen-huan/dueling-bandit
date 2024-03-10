@@ -2,6 +2,10 @@
 
 Algorithms for the multi-armed bandit and dueling multi-armed bandit problems.
 
+See this
+[writeup](https://lectures.cgdct.moe/gatech/ml/luxai/egpaper_for_review.pdf#page=9)
+for a summary.
+
 See the following references (not all of these are currently implemented).
 
 1. A. Agarwal, R. Ghuge, and V. Nagarajan, "An Asymptotically
@@ -50,3 +54,23 @@ See the following references (not all of these are currently implemented).
 12. M. Zoghi, Z. Karnin, S. Whiteson, and M. de Rijke,
     "Copeland Dueling Bandits." arXiv, May 2015. doi:
     [10.48550/arXiv.1506.00312](https://doi.org/10.48550/arXiv.1506.00312).
+
+## Experimental results
+
+### Setup 1
+
+![Setup 1 regret](./results/regret_1.png)
+
+### Setup 2
+
+![Setup 2 regret](./results/regret_2.png)
+
+### Setup 3
+
+![Setup 3 regret](./results/regret_3.png)
+
+![Setup 3 win percentage](./results/winner_3.png)
+
+### Setup 4
+
+![Setup 4 win percentage](./results/winner_4.png)
