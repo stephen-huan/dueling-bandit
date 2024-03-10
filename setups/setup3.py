@@ -10,7 +10,7 @@ from bandit import algorithms, problems
 # enable int64/float64
 jax.config.update("jax_enable_x64", True)
 # set random seed
-rng = random.key(0)
+rng = random.key(5)
 
 setup_name = "3"
 K = 10
